@@ -9,7 +9,7 @@
       <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
       <Platforms>x64</Platforms>
 	
-	  <PackageId>WolvenKit.Core</PackageId>
+	  <PackageId>WolvenInstaller</PackageId>
 	  <Author>Moritz Baron</Author>
 	  <Product>WolvenInstaller</Product>
 	  <Description>A simple auto installer.</Description>
