@@ -1,0 +1,52 @@
+name: release.NET
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 5.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+
+  # environmental variables
+    - run: echo "PROJ=./WolvenManager.Installer/WolvenManager.Installer.csproj" >> $env:GITHUB_ENV
+    - run: echo "REF=${{github.ref}}" >> $env:GITHUB_ENV
+    - run: echo "SHA=${{github.sha}}" >> $env:GITHUB_ENV
+    - run: echo "REPO=${{github.repository}}" >> $env:GITHUB_ENV
+
+    - name: Get version
+      uses: naminodarie/get-net-sdk-project-versions-action@v1
+      id: get-version
+      with:
+        proj-path:  ${{env.PROJ}}
+    - run: echo "VERSION=${{steps.get-version.outputs.assembly-version}}" >> $env:GITHUB_ENV
+
+    - name: publish
+      run: dotnet publish -o ./publish -p:PublishSingleFile=true --no-self-contained -r win-x64 -c Release -f net5.0
+    - name: upload artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: WolvenInstaller
+        path: ./publish
+    
+   # RELEASE
+    - name: release
+      run: |
+          gh release create ${{ env.VERSION }} -d -n "${{ env.MESSAGE }}" -t "${{ env.VERSION }}" ${{ env.FILES }}
+      env:
+        MESSAGE: "The latest commit this release is based on is: [#${{env.SHA}}](https://github.com/${{env.REPO}}/commit/${{env.SHA}})"
+        FILES: ./publish/WolvenManager.Installer.exe
+
+   # PUBLISH NUGET
+    - name: nuget
+      run: |
+          dotnet nuget push .\WolvenManager.Installer\nupkg\WolvenInstaller.${{ env.VERSION }}.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
