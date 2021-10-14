@@ -39,12 +39,14 @@ jobs:
         path: ./publish
     
    # RELEASE
+   # RELEASE
     - name: release
-      run: |
-          gh release create ${{ env.VERSION }} -d -n "${{ env.MESSAGE }}" -t "${{ env.VERSION }}" ${{ env.FILES }}
-      env:
-        MESSAGE: "The latest commit this release is based on is: [#${{env.SHA}}](https://github.com/${{env.REPO}}/commit/${{env.SHA}})"
-        FILES: ./publish/WolvenManager.Installer.exe
+      uses: softprops/action-gh-release@v1
+      with:
+        files: ./publish/WolvenManager.Installer.exe
+        body: "The latest commit this release is based on is: [#${{env.SHA}}](https://github.com/${{env.REPO}}/commit/${{env.SHA}})"
+        draft: true
+        tag_name: ${{ env.VERSION }}
 
    # PUBLISH NUGET
     - name: nuget
