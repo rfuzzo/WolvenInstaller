@@ -3,7 +3,7 @@
   <PropertyGroup>
       <OutputType>Exe</OutputType>
       <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-      <TargetFramework>net5.0</TargetFramework>
+      <TargetFramework>net6.0</TargetFramework>
       <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
       <DebugType>embedded</DebugType>
       <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -18,7 +18,7 @@
 	  <RepositoryUrl>https://github.com/rfuzzo/WolvenInstaller</RepositoryUrl>
 	  <RepositoryType>git</RepositoryType>
 	  <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-	  <Version>1.0.0</Version>
+	  <Version>1.1.0</Version>
 	  <PackageOutputPath>./nupkg</PackageOutputPath>
 	  <DebugType>embedded</DebugType>
 	  <Platforms>x64</Platforms>

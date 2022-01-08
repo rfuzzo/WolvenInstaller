@@ -20,6 +20,11 @@ namespace WolvenManager.Installer.Services
         /// <param name="updateUrls"></param>
         /// <param name="assemblyName"></param>
         /// <param name="updateAction"></param>
-        void Init(string[] updateUrls, string assemblyName, Action<FileInfo, bool> updateAction, Action<string, Func<bool, bool>> askAction);
+        /// <param name="askAction"></param>
+        void Init(
+            string[] updateUrls, 
+            string assemblyName, 
+            Action<FileInfo, bool> updateAction, 
+            Action<string, Func<bool, Task<bool>>> askAction);
     }
 }

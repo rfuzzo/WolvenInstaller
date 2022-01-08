@@ -23,7 +23,7 @@ namespace WolvenManager.Installer.Services
         private string[] _remoteUris;
         private string _assemblyName;
         private Action<FileInfo, bool> _updateAction;
-        private Action<string, Func<bool, bool>> _askAction;
+        private Action<string, Func<bool, Task<bool>>> _askAction;
 
         #endregion
 
@@ -50,9 +50,14 @@ namespace WolvenManager.Installer.Services
         /// <param name="updateUrls">full url to where the manifest is located</param>
         /// <param name="assemblyName">loaded assembly name to check the version against</param>
         /// <param name="updateAction">action to execute for managed installs</param>
-        public void Init(string[] updateUrls, string assemblyName, Action<FileInfo, bool> updateAction, Action<string, Func<bool, bool>> askAction)
+        /// <param name="askAction"></param>
+        public void Init(
+            string[] updateUrls, 
+            string assemblyName, 
+            Action<FileInfo, bool> updateAction, 
+            Action<string, Func<bool, Task<bool>>> askAction)
         {
-            if (updateUrls.Any(x => string.IsNullOrEmpty(x)))
+            if (updateUrls.Any(string.IsNullOrEmpty))
             {
                 return;
             }
@@ -189,74 +194,77 @@ namespace WolvenManager.Installer.Services
         {
             var latestVersion = manifest.Version;
 
-            _askAction($"Update available. Would you like to update to the latest version {latestVersion}?",
-                delegate(bool b)
+            _askAction($"Update available. Would you like to update to the latest version {latestVersion}?", async delegate(bool b)
                 {
                     if (!b)
                     {
                         return true;
                     }
 
-                    using (var wc = new WebClient())
-                    {
-                        var dlObservable = Observable.FromEventPattern<DownloadProgressChangedEventHandler, DownloadProgressChangedEventArgs>(
-                            handler => wc.DownloadProgressChanged += handler,
-                            handler => wc.DownloadProgressChanged -= handler);
-                        var dlCompleteObservable = Observable.FromEventPattern<AsyncCompletedEventHandler, AsyncCompletedEventArgs>(
-                            handler => wc.DownloadFileCompleted += handler,
-                            handler => wc.DownloadFileCompleted -= handler);
+                    using var wc = new HttpClient();
+                    var uri = new Uri($"{GetUpdateUri().TrimEnd('/')}/{manifest.Get(type).Key}");
+                    var physicalPath = Path.Combine(Path.GetTempPath(), manifest.Get(type).Key);
+                    
+                    var response = await wc.GetAsync(uri);
+                    response.EnsureSuccessStatusCode();
+                    
+                    // var dlObservable = Observable.FromEventPattern<DownloadProgressChangedEventHandler, DownloadProgressChangedEventArgs>(
+                    //     handler => wc.DownloadProgressChanged += handler,
+                    //     handler => wc.DownloadProgressChanged -= handler);
+                    // var dlCompleteObservable = Observable.FromEventPattern<AsyncCompletedEventHandler, AsyncCompletedEventArgs>(
+                    //     handler => wc.DownloadFileCompleted += handler,
+                    //     handler => wc.DownloadFileCompleted -= handler);
 
-                        _ = dlObservable
-                            .Select(_ => (double)_.EventArgs.ProgressPercentage)
-                            .Subscribe(d =>
-                            {
-                                Report(d / 100);
-                            });
+                    // _ = dlObservable
+                    //     .Select(_ => (double)_.EventArgs.ProgressPercentage)
+                    //     .Subscribe(d =>
+                    //     {
+                    //         Report(d / 100);
+                    //     });
 
-                        _ = dlCompleteObservable
-                            .Select(_ => _.EventArgs)
-                            .Subscribe(c =>
-                            {
-                                OnDownloadCompletedCallback(c, manifest, type);
-                            });
+                    // _ = dlCompleteObservable
+                    //     .Select(_ => _.EventArgs)
+                    //     .Subscribe(c =>
+                    //     {
+                    //         OnDownloadCompletedCallback(c, manifest, type);
+                    //     });
 
-                        var uri = new Uri($"{GetUpdateUri().TrimEnd('/')}/{manifest.Get(type).Key}");
-                        var physicalPath = Path.Combine(Path.GetTempPath(), manifest.Get(type).Key);
-                        wc.DownloadFileAsync(uri, physicalPath);
-                    }
+                    await using var fs = new FileStream(physicalPath, System.IO.FileMode.Create);
+                    await response.Content.CopyToAsync(fs);
+
+                    OnDownloadCompletedCallback(manifest, type);
+                    
                     return true;
                 });
 
             await Task.CompletedTask;
         }
 
-        private void OnDownloadCompletedCallback(AsyncCompletedEventArgs e, Manifest manifest, EIncludedFiles type)
+        private void OnDownloadCompletedCallback(/*AsyncCompletedEventArgs e,*/ Manifest manifest, EIncludedFiles type)
         {
-            if (e.Cancelled)
-            {
-                Console.WriteLine("File download cancelled.");
-            }
-
-            if (e.Error != null)
-            {
-                Console.WriteLine(e.Error);
-            }
+            // if (e.Cancelled)
+            // {
+            //     Console.WriteLine("File download cancelled.");
+            // }
+            //
+            // if (e.Error != null)
+            // {
+            //     Console.WriteLine(e.Error);
+            // }
 
             // check downloaded file
             var physicalPath = new FileInfo(Path.Combine(Path.GetTempPath(), manifest.Get(type).Key));
             if (physicalPath.Exists)
             {
-                using (var mySha256 = SHA256.Create())
+                using var mySha256 = SHA256.Create();
+                var hash = Helpers.HashFile(physicalPath, mySha256);
+                if (manifest.Get(type).Value.Equals(hash))
                 {
-                    var hash = Helpers.HashFile(physicalPath, mySha256);
-                    if (manifest.Get(type).Value.Equals(hash))
-                    {
-                        HandleUpdateFromFile(physicalPath);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Downloaded file does not match expected file.");
-                    }
+                    HandleUpdateFromFile(physicalPath);
+                }
+                else
+                {
+                    Console.WriteLine("Downloaded file does not match expected file.");
                 }
             }
             else
@@ -271,11 +279,11 @@ namespace WolvenManager.Installer.Services
             IsUpdateReadyToInstall = true;
 
             // ask user to restart
-            _askAction($"Update ready to install - restart?", delegate(bool b)
+            _askAction($"Update ready to install - restart?", async delegate(bool b)
             {
                 if (!b)
                 {
-                    return true;
+                    return await Task.FromResult(true);
                 }
 
                 _updateAction(path, IsManaged());
