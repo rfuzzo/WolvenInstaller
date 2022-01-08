@@ -31,7 +31,7 @@ jobs:
     - run: echo "VERSION=${{steps.get-version.outputs.assembly-version}}" >> $env:GITHUB_ENV
 
     - name: publish
-      run: dotnet publish -o ./publish -p:PublishSingleFile=true --no-self-contained -r win-x64 -c Release -f net5.0
+      run: dotnet publish -o ./publish -p:PublishSingleFile=true --no-self-contained -r win-x64 -c Release
     - name: upload artifact
       uses: actions/upload-artifact@v2
       with:
